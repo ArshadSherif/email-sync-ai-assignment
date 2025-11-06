@@ -91,7 +91,7 @@ export default function Page() {
           if (debounceTimeout) clearTimeout(debounceTimeout);
           debounceTimeout = setTimeout(() => {
             setPage((p) => p + 1);
-          }, 3000); 
+          }, 1000); 
         }
       },
       {
@@ -163,9 +163,12 @@ export default function Page() {
         {!searchMode && hasMore && (
           <div
             ref={loadMoreRef}
-            className="h-10 mt-4 text-center text-gray-500"
+            className="mt-8 flex flex-col items-center justify-center gap-2 text-gray-600"
           >
-            Loading more...
+            <div className="h-5 w-5 rounded-full bg-gradient-to-r from-fuchsia-500 via-violet-500 to-indigo-500 animate-spin" />
+            <p className="text-sm font-medium text-gray-600 animate-pulse">
+              Loading more emails...
+            </p>
           </div>
         )}
       </main>
