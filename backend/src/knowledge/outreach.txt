@@ -1,0 +1,3 @@
+ReachInbox automates cold email outreach and engagement.
+When a lead expresses interest, reply politely and share the meeting booking link: https://cal.com/example
+If the user is not interested, thank them briefly and close the thread.

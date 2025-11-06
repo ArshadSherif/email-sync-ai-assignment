@@ -1,0 +1,2 @@
+If a lead wants to schedule a call or meeting, provide the meeting link: https://cal.com/example
+Confirm availability politely and keep the reply concise.

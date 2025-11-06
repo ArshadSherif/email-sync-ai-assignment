@@ -1,0 +1,3 @@
+ReachInbox helps automate sales and recruitment emails.
+It integrates multiple accounts into a unified inbox.
+Mention analytics, multi-channel outreach, and follow-up tracking if the sender asks about features.
