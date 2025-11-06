@@ -29,7 +29,7 @@ export default function Page() {
     setLoading(true);
 
     try {
-      const data = await getEmails(pageNum, 10, {
+      const data = await getEmails(pageNum, 20, {
         folder: activeFolder,
         accountId: activeAccount,
       });
@@ -97,7 +97,7 @@ export default function Page() {
       {
         root: null,
         rootMargin: "400px", 
-        threshold: 0.2, 
+        threshold: 0.3, 
       }
     );
 

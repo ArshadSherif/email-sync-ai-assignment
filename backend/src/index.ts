@@ -19,9 +19,6 @@ app.use("/api/ai", aiRoutes);
 async function startServer() {
   await setupElasticIndex();
 
-  // persistent IMAP sync
-  startIMAPSync();
-
   // vector DB training
   initQdrant();
 
@@ -33,6 +30,8 @@ async function startServer() {
       }`
     );
   });
+  // persistent IMAP sync
+  startIMAPSync();
 }
 
 startServer();
