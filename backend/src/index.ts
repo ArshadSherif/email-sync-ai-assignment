@@ -30,7 +30,7 @@ async function startServer() {
       }`
     );
     // persistent IMAP sync
-    // startIMAPSync();
+    startIMAPSync();
   });
 }
 
