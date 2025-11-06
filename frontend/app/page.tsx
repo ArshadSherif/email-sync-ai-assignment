@@ -4,111 +4,123 @@ import { useEffect, useRef, useState } from "react";
 import Sidebar from "@/components/shared/sidebar";
 import EmailList from "@/components/emailList";
 import SearchBar from "@/components/shared/searchBar";
-
 import { getEmails, searchEmails } from "@/lib/api";
 import { Email } from "@/types/email";
 import Fallback from "@/components/utils/fallback";
+import EmailSkeleton from "@/components/utils/skeleton";
 
 export default function Page() {
   const [emails, setEmails] = useState<Email[]>([]);
-  const [cachedEmails, setCachedEmails] = useState<Email[]>([]);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
+  const [searchMode, setSearchMode] = useState(false);
   const [activeCategory, setActiveCategory] = useState("All");
   const [activeFolder, setActiveFolder] = useState("All");
-  const [searchMode, setSearchMode] = useState(false);
   const [activeAccount, setActiveAccount] = useState("All");
 
   const observer = useRef<IntersectionObserver | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const loadingRef = useRef(false);
 
   async function loadEmails(pageNum: number) {
+    if (loadingRef.current) return; // prevent overlap
+    loadingRef.current = true;
     setLoading(true);
 
-    const data = await getEmails(pageNum, 10, {
-      folder: activeFolder,
-      accountId: activeAccount,
-    });
+    try {
+      const data = await getEmails(pageNum, 10, {
+        folder: activeFolder,
+        accountId: activeAccount,
+      });
 
-    const newEmails: Email[] = data.data || [];
+      const newEmails: Email[] = data?.data || [];
 
-    setCachedEmails((prev) => {
-      const ids = new Set(prev.map((e) => e.id));
-      return [...prev, ...newEmails.filter((e) => !ids.has(e.id))];
-    });
+      setEmails((prev) => {
+        const existingIds = new Set(prev.map((e) => e.id));
+        const merged = [
+          ...prev,
+          ...newEmails.filter((e) => !existingIds.has(e.id)),
+        ];
+        return merged;
+      });
 
-    setHasMore(newEmails.length > 0);
-    setLoading(false);
+      setHasMore(newEmails.length > 0);
+    } finally {
+      loadingRef.current = false;
+      setLoading(false);
+    }
   }
 
   async function handleSearch(q: string) {
     if (!q.trim()) {
       setSearchMode(false);
-      setEmails(cachedEmails);
+      setPage(1);
       return;
     }
 
-    setLoading(true);
     setSearchMode(true);
+    setLoading(true);
 
-    const res = await searchEmails(q);
-    const found: Email[] = Array.isArray(res)
-      ? res.map((hit: any) => ({
-          id: hit._id,
-          ...hit._source,
-        }))
-      : [];
-
-    setEmails(found);
-    setLoading(false);
+    try {
+      const res = await searchEmails(q);
+      const found: Email[] = Array.isArray(res)
+        ? res.map((hit: any) => ({
+            id: hit._id,
+            ...hit._source,
+          }))
+        : [];
+      setEmails(found);
+    } finally {
+      setLoading(false);
+    }
   }
 
-  // Infinite scroll observer with debounce
+  // scroll observer (trigger once user gets close to bottom)
   useEffect(() => {
     if (searchMode || !hasMore) return;
     const elem = loadMoreRef.current;
     if (!elem) return;
 
-    let timeout: NodeJS.Timeout | null = null;
-    let canLoad = true;
+    let debounceTimeout: NodeJS.Timeout | null = null;
 
     observer.current = new IntersectionObserver(
       (entries) => {
         const entry = entries[0];
-        if (entry.isIntersecting && !loading && canLoad) {
-          canLoad = false;
-
-          // Debounce next call by 2s
-          timeout = setTimeout(() => {
-            canLoad = true;
-          }, 2000);
-
-          setPage((p) => p + 1);
+        if (entry.isIntersecting && !loadingRef.current) {
+          if (debounceTimeout) clearTimeout(debounceTimeout);
+          debounceTimeout = setTimeout(() => {
+            setPage((p) => p + 1);
+          }, 3000); 
         }
       },
       {
         root: null,
-        rootMargin: "200px", // trigger before bottom reaches viewport
-        threshold: 0.1, // 10% visible
+        rootMargin: "400px", 
+        threshold: 0.2, 
       }
     );
 
     observer.current.observe(elem);
     return () => {
       observer.current?.disconnect();
-      if (timeout) clearTimeout(timeout);
+      if (debounceTimeout) clearTimeout(debounceTimeout);
     };
-  }, [loading, searchMode, hasMore]);
+  }, [searchMode, hasMore]);
 
-  // fetch emails when page changes
   useEffect(() => {
     if (!searchMode) loadEmails(page);
   }, [page, searchMode]);
 
-  const displayEmails = searchMode ? emails : cachedEmails;
+  useEffect(() => {
+    // reset cache only when folder/account changes
+    setEmails([]);
+    setPage(1);
+    setHasMore(true);
+    loadEmails(1);
+  }, [activeFolder, activeAccount]);
 
-  const filteredEmails = displayEmails.filter((e) => {
+  const filteredEmails = emails.filter((e) => {
     const matchFolder = activeFolder === "All" || e.folder === activeFolder;
     const matchCategory =
       activeCategory === "All" || e.category === activeCategory;
@@ -117,26 +129,10 @@ export default function Page() {
     return matchFolder && matchCategory && matchAccount;
   });
 
-  useEffect(() => {
-    if (!searchMode) {
-      // Reset scroll and observer before reloading
-      window.scrollTo({ top: 0, behavior: "instant" });
-      observer.current?.disconnect();
-
-      // Reset pagination + cache
-      setCachedEmails([]);
-      setPage(1);
-      setHasMore(true);
-
-      // Fetch fresh batch cleanly
-      loadEmails(1);
-    }
-  }, [activeFolder, activeAccount]);
-
   return (
     <div className="flex min-h-screen pt-[60px]">
       <Sidebar
-        emails={cachedEmails}
+        emails={emails}
         activeCategory={activeCategory}
         setActiveCategory={setActiveCategory}
         activeFolder={activeFolder}
@@ -148,8 +144,10 @@ export default function Page() {
       <main className="flex-1 p-6 overflow-y-auto mt-[-55]">
         <SearchBar onSearch={handleSearch} />
 
-        {loading && (
-          <div className="text-center text-gray-500 mt-10">Loading...</div>
+        {loading && page === 1 && (
+          <div className="p-6">
+            <EmailSkeleton />
+          </div>
         )}
 
         {!loading && filteredEmails.length === 0 && (
@@ -160,9 +158,7 @@ export default function Page() {
           />
         )}
 
-        {!loading && filteredEmails.length > 0 && (
-          <EmailList emails={filteredEmails} />
-        )}
+        {filteredEmails.length > 0 && <EmailList emails={filteredEmails} />}
 
         {!searchMode && hasMore && (
           <div

@@ -49,7 +49,6 @@ export default function EmailDetailPage() {
   return (
     <div className="min-h-screen bg-gray-50 py-10 px-6 flex justify-center">
       <div className="max-w-5xl w-full bg-white shadow-sm rounded-xl p-8 border border-gray-200">
-        {/* Header */}
         <div className="border-b border-gray-200 pb-5 mb-6">
           <div className="flex items-center gap-3 mb-2">
             <Mail className="w-5 h-5 text-blue-600" />
@@ -76,7 +75,6 @@ export default function EmailDetailPage() {
           </div>
         </div>
 
-        {/* View toggle */}
         <div className="flex justify-end mb-4">
           <button
             onClick={() => setShowHtml((p) => !p)}
@@ -86,7 +84,6 @@ export default function EmailDetailPage() {
           </button>
         </div>
 
-        {/* Email content */}
         <div className="border rounded-lg overflow-hidden min-h-[400px]">
           {showHtml && email.html ? (
             <iframe
@@ -101,7 +98,6 @@ export default function EmailDetailPage() {
           )}
         </div>
 
-        {/* Metadata */}
         <div className="mt-8 flex flex-wrap gap-4 text-sm">
           <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-100 rounded-full text-blue-700 font-medium">
             <Folder className="w-4 h-4 text-blue-500" />
@@ -127,14 +123,19 @@ export default function EmailDetailPage() {
           </div>
         </div>
 
-        {/* AI Reply */}
         <div className="mt-10 flex justify-center">
           <button
             onClick={handleGenerateReply}
             disabled={generating}
-            className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-sm transition disabled:opacity-60"
+            className="flex items-center justify-center gap-3 
+             px-8 py-3.5 text-lg font-semibold 
+             bg-gradient-to-r from-fuchsia-600 via-violet-600 to-indigo-500
+             hover:from-fuchsia-700 hover:via-violet-700 hover:to-indigo-600
+             text-white rounded-xl shadow-md
+             transition-all duration-200
+             disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            <Sparkles className="w-5 h-5" />
+            <Sparkles className="w-6 h-6 text-white" />
             {generating
               ? "Generating Reply..."
               : aiReply
@@ -143,7 +144,6 @@ export default function EmailDetailPage() {
           </button>
         </div>
 
-        {/* AI Reply Output */}
         {aiReply && (
           <div className="mt-8 bg-gray-50 border border-gray-200 rounded-xl p-6">
             <h2 className="font-semibold text-lg text-gray-800 mb-3 flex items-center gap-2">

@@ -20,7 +20,7 @@ async function startServer() {
   await setupElasticIndex();
 
   // persistent IMAP sync
-  startIMAPSync();
+  // startIMAPSync();
 
   // vector DB training
   initQdrant();

@@ -6,7 +6,7 @@ const api = axios.create({
 
 export async function getEmails(
   page = 1,
-  size = 10,
+  size = 20,
   filters?: { folder?: string; accountId?: string }
 ) {
   // Always stringify primitives
