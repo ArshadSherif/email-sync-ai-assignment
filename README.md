@@ -42,6 +42,51 @@ This README explains project structure, key libraries, how to run the app in dev
   - `next`, `react` — UI
   - `axios` — HTTP
   - `tailwindcss` (dev) — styling
+ 
+  
+## Notable implementation details 
+
+- IMAP sync:
+  - Uses ImapFlow with a historical fetch of the last 30 days, then a persistent idle() loop for live updates.
+  - When a new message arrives, the code uses imap.mailbox.exists as the seq number; the code contains narrow checks to ensure mailbox is an object before accessing .exists to avoid runtime/TS errors.
+  - Message indexing uses mailparser.simpleParser to extract text and HTML.
+  - Supports **multiple accounts** concurrently; each message indexed with an associated `accountId`  for filtering.
+
+- Elasticsearch:
+  - The code relies on dynamic indexing and updates via client.index and client.update.
+  - Search uses client.search with match_all or bool.must clauses.
+  - Index creation and mappings are initialized automatically on startup using `setupElasticIndex()`.
+  - result.hits.total can be numeric or an object with a .value property depending on ES client settings; the code handles both shapes in places.
+
+- AI:
+  - **Categorization**:  
+    - Uses Google **Gemini** via `@google/generative-ai` to categorize emails into predefined labels:  
+    `Interested`, `Meeting Booked`, `Not Interested`, `Spam`, `Out of Office`.  
+    - Trigger logic: emails labeled `Interested` automatically send **Slack notifications** and **webhook triggers**.  
+    - Categories stored directly in Elasticsearch to allow filtered searches.  
+
+  - **Embeddings / RAG Reply System**:  
+    - Uses `@xenova/transformers` for **local feature extraction (embeddings)** without cloud inference.  
+    - Applies **mean pooling** over token embeddings (dimension 384 for `all-MiniLM-L6-v2` model).  
+    - Stores these embeddings in **Qdrant**, enabling **semantic retrieval** for context-aware reply generation.  
+    - Reply suggestion flow:  
+      1. Query Qdrant for context (most relevant vectors).  
+      2. Merge with user-defined "product and outreach agenda."  
+      3. Pass to Gemini to generate a contextual, natural reply.
+      4. 
+- Architechure-level design
+  - Designed as a **modular monorepo** with clear boundaries between backend, frontend, and AI subsystems.  
+  - Each subsystem (IMAP sync, Elasticsearch, AI, notifications) operates independently yet communicates through consistent interfaces.  
+  - Ensures **event-driven behavior** — new emails trigger categorization, which triggers notifications and indexing automatically.  
+  - Startup sequence:  
+    1. Initialize Elasticsearch mappings.  
+    2. Start IMAP sync loop (persistent connections).  
+    3. Initialize Qdrant vector DB and embed training data.  
+  - The backend runs **entirely async**, meaning none of these block the server startup.
+
+
+- PrepareEmailContent:
+  - The helper strips <img> tags and unwraps anchors via regex, then calls html-to-text. This is simple and effective for many cases but not robust for complex/nested HTML. Consider using an HTML parser (cheerio) for production-quality preprocessing.
 
 ## Environment variables
 
@@ -140,11 +185,6 @@ Open the frontend in the browser (e.g., `http://localhost:3001`).
 
 For production deployments, you likely want Dockerfiles, proper process managers, and secure storage for secrets.
 
-## Docker notes
-
-- `backend/docker-compose.yml` runs Elasticsearch (8.14) and Qdrant. It disables ES security for dev by setting `xpack.security.enabled=false`. Adjust for production and read ES docs about security and memory tuning.
-- Volumes `es_data` and `qdrant_data` persist data between runs.
-- Elasticsearch requires `vm.max_map_count` larger than default on some systems; if ES fails to start, check the container logs and host kernel settings.
 
 ## API overview
 - `GET /api/emails` — paginated list (query params: `page`, `size`, `folder`, `accountId`)
@@ -153,19 +193,3 @@ For production deployments, you likely want Dockerfiles, proper process managers
 - `POST /api/ai/suggest-reply` — generate an AI reply (see `frontend/lib/api.ts` usage)
 
 Refer to `backend/src/routes` and `backend/src/controllers` for exact request/response shapes used by the frontend.
-
-## Known issues & troubleshooting
-
-- TypeScript cannot find types for `@xenova/transformers` — add a local `declare module "@xenova/transformers";` to suppress or create proper types. The code currently uses a permissive `any` around the embedder.
-- Qdrant client import mismatch: code imports `@qdrant/js-client-rest` but `package.json` lists `@qdrant/qdrant-js`. If you hit runtime import errors, either install the client used in code or update imports to match the installed package.
-- Elasticsearch connection errors: ensure `ELASTIC_URL` is correct and ES has finished booting. Check `docker compose logs elasticsearch`.
-- IMAP connection errors: ensure credentials and host are correct; IMAP hosts sometimes require app-specific passwords or OAuth.
-
-## Suggested next steps / improvements
-
-- Add `backend/.env.example` (added here) and `frontend/.env.example` (added here).
-- Add a minimal `Dockerfile` for backend and frontend and expand `docker-compose` to build/run them for a one-command dev start.
-- Add type declarations for `@xenova/transformers` or replace with an SDK that ships types.
-- Add integration tests that mock IMAP & ES to validate the ingest pipeline.
-
----
