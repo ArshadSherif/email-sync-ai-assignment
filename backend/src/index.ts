@@ -29,9 +29,9 @@ async function startServer() {
         `http://localhost:${process.env.PORT || 3000}`
       }`
     );
+    // persistent IMAP sync
+    startIMAPSync();
   });
-  // persistent IMAP sync
-  startIMAPSync();
 }
 
 startServer();
