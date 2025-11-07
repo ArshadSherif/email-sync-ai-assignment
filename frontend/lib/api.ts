@@ -7,21 +7,19 @@ const api = axios.create({
 export async function getEmails(
   page = 1,
   size = 20,
-  filters?: { folder?: string; accountId?: string }
+  filters?: { folder?: string; accountId?: string; category?: string }
 ) {
-  // Always stringify primitives
   const params = new URLSearchParams({
     page: String(page),
     size: String(size),
   });
 
-  // Add filters if provided
-  if (filters?.folder && filters.folder !== "All") {
+  if (filters?.folder && filters.folder !== "All")
     params.append("folder", filters.folder);
-  }
-  if (filters?.accountId && filters.accountId !== "All") {
+  if (filters?.accountId && filters.accountId !== "All")
     params.append("accountId", filters.accountId);
-  }
+  if (filters?.category && filters.category !== "All")
+    params.append("category", filters.category);
 
   const res = await api.get(`/api/emails/getEmails?${params.toString()}`);
   return res.data;

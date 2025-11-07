@@ -55,26 +55,29 @@ export const categorize = async (req: Request, res: Response) => {
 };
 
 export const getEmails = async (req: Request, res: Response) => {
-  const { page = 1, size = 50, folder, accountId } = req.query;
+  const { page = 1, size = 50, folder, accountId, category } = req.query;
   const from = (Number(page) - 1) * Number(size);
 
   try {
-    // Build dynamic filters for Elasticsearch
     const must: any[] = [];
-    if (folder && folder !== "All") {
-      must.push({ term: { folder: String(folder).toLowerCase() } });
-    }
-    if (accountId && accountId !== "All") {
-      must.push({ term: { accountId: String(accountId).toLowerCase() } });
-    }
 
-    // Fetch paginated + filtered emails
+    // Filters (use match to avoid case issues)
+    if (folder && folder !== "All")
+      must.push({ match: { folder: String(folder) } });
+    if (accountId && accountId !== "All")
+      must.push({ match: { accountId: String(accountId) } });
+    if (category && category !== "All")
+      must.push({ match: { category: String(category) } });
+
+    const query = must.length ? { bool: { must } } : { match_all: {} };
+
+    // Paginated fetch
     const result = await client.search({
       index: "emails",
       from,
       size: Number(size),
       sort: [{ date: { order: "desc" } }],
-      query: must.length ? { bool: { must } } : { match_all: {} },
+      query,
     });
 
     const emails: EmailDoc[] = result.hits.hits.map((hit) => ({
@@ -82,22 +85,21 @@ export const getEmails = async (req: Request, res: Response) => {
       ...(hit._source as Record<string, any>),
     }));
 
-    // Filter uncategorized emails (only from this filtered batch)
+    // Identify uncategorized items
     const uncategorized = emails.filter(
       (e) => !e.category && e.text && e.text.trim().length > 0
     );
 
-    //  Batch categorize if needed
+    // Batch categorize as needed
     if (uncategorized.length > 0) {
       console.log(
         `Categorizing ${uncategorized.length} uncategorized emails...`
       );
-
       const results = await categorizeEmailsBatch(
         uncategorized.map((e) => ({ id: e.id, text: e.text! }))
       );
 
-      //  Update categorized emails back into Elasticsearch
+      // Persist results back to Elasticsearch and local batch
       for (const r of results) {
         if (!r.category || r.category === "Uncategorized") continue;
 
